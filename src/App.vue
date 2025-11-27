@@ -3,6 +3,8 @@ import { ref } from 'vue'
 
 const totalTimeMinutes = ref(1) // Temps total en minuts
 const numAlarms = ref(5) // Número d'alarmes
+const gapFactor = ref(0.4) // Factor per calcular el gap mínim (0.0 - 1.0)
+const showAdvanced = ref(false) // Mostrar configuració avançada
 const isRunning = ref(false)
 const isPaused = ref(false)
 const showAlarmModal = ref(false)
@@ -48,7 +50,12 @@ const playAlarmSound = () => {
 const generateRandomAlarmTimes = () => {
   const totalTimeSeconds = totalTimeMinutes.value * 60
   const availableTime = totalTimeSeconds - 2 * bufferTime
-  const minGapBetweenAlarms = 30 // Mínim 30 segons entre alarmes
+
+  // Calcula el gap mínim basat en el temps disponible i el número d'alarmes
+  // Fórmula: gap_mínim = max(5, min(30, (temps_disponible / (alarmes + 1)) * factor))
+  const theoreticalGap = availableTime / (numAlarms.value + 1)
+  const minGapBetweenAlarms = Math.max(5, Math.min(30, theoreticalGap * gapFactor.value))
+
   const times: number[] = []
 
   // Genera temps aleatoris amb una distància mínima entre ells
@@ -59,7 +66,7 @@ const generateRandomAlarmTimes = () => {
     attempts++
     const randomTime = bufferTime + Math.random() * availableTime
 
-    // Comprova que el nou temps tingui almenys 5 segons de distància amb els altres
+    // Comprova que el nou temps tingui el gap mínim de distància amb els altres
     const tooClose = times.some((existingTime) => {
       return Math.abs(randomTime - existingTime) < minGapBetweenAlarms
     })
@@ -203,6 +210,14 @@ const formatTime = (seconds: number) => {
   const secs = Math.floor(seconds % 60)
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
+
+const calculateCurrentGap = () => {
+  const totalTimeSeconds = totalTimeMinutes.value * 60
+  const availableTime = totalTimeSeconds - 2 * bufferTime
+  const theoreticalGap = availableTime / (numAlarms.value + 1)
+  const minGap = Math.max(5, Math.min(30, theoreticalGap * gapFactor.value))
+  return Math.round(minGap)
+}
 </script>
 
 <template>
@@ -224,6 +239,43 @@ const formatTime = (seconds: number) => {
       <div class="input-group">
         <label for="alarms">Número d'alarmes:</label>
         <input id="alarms" v-model.number="numAlarms" type="number" min="1" :disabled="isRunning" />
+      </div>
+
+      <button
+        @click="showAdvanced = !showAdvanced"
+        class="toggle-advanced"
+        :disabled="isRunning"
+        type="button"
+      >
+        {{ showAdvanced ? '▲' : '▼' }} Configuració avançada
+      </button>
+
+      <div v-show="showAdvanced" class="advanced-section">
+        <div class="input-group">
+          <label for="gapFactor">Factor de gap (0.0 - 1.0):</label>
+          <input
+            id="gapFactor"
+            v-model.number="gapFactor"
+            type="number"
+            min="0"
+            max="1"
+            step="0.1"
+            :disabled="isRunning"
+          />
+          <span class="gap-info">Gap mínim: ~{{ calculateCurrentGap() }}s</span>
+        </div>
+
+        <div class="formula-info">
+          <strong>📐 Fórmula:</strong><br />
+          Gap mínim = max(5, min(30, ({{ totalTimeMinutes * 60 - 10 }} / {{ numAlarms + 1 }}) ×
+          {{ gapFactor }}))
+          <br />
+          <small
+            >Temps disponible: {{ totalTimeMinutes * 60 - 10 }}s | Gap teòric: ~{{
+              Math.round((totalTimeMinutes * 60 - 10) / (numAlarms + 1))
+            }}s</small
+          >
+        </div>
       </div>
 
       <button @click="startAlarms" :disabled="isRunning" class="play-button">▶️ Començar</button>
@@ -322,6 +374,64 @@ input[type='number']:focus {
 input[type='number']:disabled {
   background: #e9ecef;
   cursor: not-allowed;
+}
+
+.gap-info {
+  font-size: 0.9rem;
+  color: #42b983;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.formula-info {
+  background: #fff3cd;
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+  text-align: left;
+}
+
+.formula-info strong {
+  color: #856404;
+}
+
+.formula-info small {
+  color: #666;
+}
+
+.toggle-advanced {
+  display: block;
+  background: #6c757d;
+  color: white;
+  padding: 0.6rem 1.5rem;
+  font-size: 0.95rem;
+  margin: 0.5rem 0;
+}
+
+.toggle-advanced:hover:not(:disabled) {
+  background: #5a6268;
+  transform: translateY(-1px);
+}
+
+.advanced-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 2px dashed #ddd;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 button {
