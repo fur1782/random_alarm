@@ -108,8 +108,11 @@ const startAlarms = async () => {
 const scheduleNextAlarm = () => {
   if (nextAlarmIndex >= scheduledAlarms.length) return
 
+  const nextAlarmTime = scheduledAlarms[nextAlarmIndex]
+  if (!nextAlarmTime) return
+
   const elapsedTime = Date.now() - startTime - totalPausedTime
-  const timeUntilAlarm = scheduledAlarms[nextAlarmIndex] - elapsedTime
+  const timeUntilAlarm = nextAlarmTime - elapsedTime
 
   if (timeUntilAlarm > 0) {
     const timeout = setTimeout(() => {
